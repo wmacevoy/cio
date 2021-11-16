@@ -242,7 +242,7 @@ void CIOArrayConstU32Init(CIOArray *me,
 	       (uint32_t*)data,allocated,size,size,size);
 }
 
-
+/*
 int CIOArrayElementReadWideChar(void *location) {
   return *(wchar_t*)location;
 }
@@ -250,6 +250,7 @@ int CIOArrayElementReadWideChar(void *location) {
 void CIOArrayElementWriteWideChar(void *location, int value) {
   *(wchar_t*)location = value;
 }
+
 
 void CIOArrayWideCharInit(CIOArray *me,
 		     wchar_t *data,
@@ -270,6 +271,8 @@ void CIOArrayConstWideCharInit(CIOArray *me,
 	       CIOArrayElementReadWideChar,NULL,sizeof(wchar_t),
 	       (wchar_t*)data,allocated,size,size,size);
 }
+
+*/
 
 
 static int CIOFILEPeek(CIOFILE *me, int offset) {
@@ -353,13 +356,13 @@ static int CIOUTF8Peek(CIOUTF8 *me, int offset) {
       return -1;
     }
   }
-  return ((wchar_t*)me->buffer.data)[offset];
+  return ((uint32_t*)me->buffer.data)[offset];
 }
 
 int CIOUTF8Read(CIOUTF8 *me) {
   int ans = CIOUTF8Peek(me,0);
   if (ans != -1) {
-    wchar_t *data = (wchar_t*)me->buffer.data;
+    uint32_t *data = (uint32_t*)me->buffer.data;
     int size = me->buffer.size;
     for (int i = 1; i<size; ++i) {
       data[i-1]=data[i];
@@ -386,7 +389,7 @@ int CIOUTF8Close(CIOUTF8 *me) {
 
 void CIOUTF8Init(CIOUTF8 *me, CIO *u8) {
   CIOInit(&me->base);
-  CIOArrayWideCharInit(&me->buffer,me->buffer0,0,0,sizeof(me->buffer0)/sizeof(wchar_t),INT_MAX);
+  CIOArrayU32Init(&me->buffer,me->buffer0,0,0,sizeof(me->buffer0)/sizeof(uint32_t),INT_MAX);
   me->base.read = (CIOReadPtr)&CIOUTF8Read;
   me->base.peek = (CIOPeekPtr)&CIOUTF8Peek;  
   me->base.write = (CIOWritePtr)&CIOUTF8Write;

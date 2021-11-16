@@ -334,7 +334,7 @@ void CIOFILEInit(CIOFILE *me,FILE *file,int close) {
 }
 
 static int CIOUTF8Peek(CIOUTF8 *me, int offset) {
-  unsigned char buf[6];
+  char buf[6];
   while (me->buffer.size <= offset) {
     int decoded = 0;
     for (int len = 1; len<=4; ++len) {
@@ -383,7 +383,7 @@ int CIOUTF8Write(CIOUTF8 *me, int wc) {
   return 0;
 }
 
-int CIOUTF8Close(CIOUTF8 *me) {
+void CIOUTF8Close(CIOUTF8 *me) {
   CIOClose(&me->buffer);
 }
 

@@ -80,6 +80,10 @@ FACTS(CIOUTF8In) {
       FACT(CIORead(&utf8),==,c);
     }
   }
+
+  CIOClose(&utf8);
+  CIOClose(&u8);
+  
 }
 
 FACTS(CIOUTF8Out) {
@@ -109,8 +113,40 @@ FACTS(CIOUTF8Out) {
   FACT(CIOWrite(&utf8,0),==,0);
 
   FACT(strcmp(buf,(char*)u8.data),==,0);
+
+  CIOClose(&utf8);
+  CIOClose(&u8);
 }
 
+FACTS(CIOFILEIn) {
+  FILE *tmp = tmpfile();
+  fprintf(tmp,"%s","abcdefghijklmnopqrstuvwxyz");
+  fseek(tmp,0,SEEK_SET);
+  CIOFILE ci;
+  CIOFILEInit(&ci,tmp,0);
+  for (int i='a'; i<='z'; ++i) {
+    FACT(CIOPeek(&ci,i-'a'),==,i);
+  }
+  for (int i='a'; i<='z'; ++i) {
+    FACT(CIORead(&ci),==,i);
+  }
+  CIOClose(&ci);
+}
+
+FACTS(CIOFILEOut) {
+  FILE *tmp = tmpfile();
+  CIOFILE co;
+  CIOFILEInit(&co,tmp,0);
+
+  for (int i='a'; i<='z'; ++i) {
+    FACT(CIOWrite(&co,i),==,0);
+  }
+  fseek(tmp,0,SEEK_SET);
+  for (int i='a'; i<='z'; ++i) {
+    FACT(fgetc(tmp),==,i);
+  }
+  CIOClose(&co);
+}
 
 FACTS_FINISHED
 FACTS_MAIN

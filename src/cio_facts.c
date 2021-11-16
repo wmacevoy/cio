@@ -53,8 +53,8 @@ FACTS(CIOArrayU16Dynamic) {
 }
 
 FACTS(CIOUTF8In) {
-  uint8_t buf[1024];
-  uint8_t *p=buf;
+  char buf[1024];
+  char *p=buf;
   for (int k=0; k<10; ++k) {
     for (int len=1; len<=4; ++len) {
       int c = (1<<(5*len))|(k+1);
@@ -65,7 +65,7 @@ FACTS(CIOUTF8In) {
   }
   *p = 0;
   CIOArray u8;
-  CIOArrayConstU8Init(&u8,buf,0,p-buf);
+  CIOArrayConstU8Init(&u8,(uint8_t*)buf,0,p-buf);
   CIOUTF8 utf8;
   CIOUTF8Init(&utf8,&u8.base);
   for (int k=0; k<10; ++k) {
@@ -87,8 +87,8 @@ FACTS(CIOUTF8In) {
 }
 
 FACTS(CIOUTF8Out) {
-  uint8_t buf[1024];
-  uint8_t *p=buf;
+  char buf[1024];
+  char *p=buf;
   for (int k=0; k<10; ++k) {
     for (int len=1; len<=4; ++len) {
       int c = (1<<(5*len))|(k+1);

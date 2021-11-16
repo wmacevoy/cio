@@ -15,15 +15,15 @@ tmp/utf8.o: ../utf8/src/utf8.c ../utf8/include/utf8.h
 	mkdir -p tmp
 	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
 
-tmp/cio.o: src/cio.c include/cio.h
+tmp/cio.o: src/cio.c include/cio.h ../utf8/include/utf8.h
 	mkdir -p tmp
 	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
 
-tmp/cio_facts.o : src/cio_facts.c include/cio.h ../facts/include/facts.h
+tmp/cio_facts.o : src/cio_facts.c include/cio.h ../utf8/include/utf8.h ../facts/include/facts.h
 	mkdir -p tmp
 	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
 
-bin/cio_facts : tmp/cio_facts.o tmp/cio.o tmp/facts.o
+bin/cio_facts : tmp/cio_facts.o tmp/utf8.o tmp/cio.o tmp/facts.o
 	mkdir -p bin
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 

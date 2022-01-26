@@ -7,7 +7,7 @@ CFLAGS=$(CDBG) $(COPT) $(CSTD) $(CINC)
 
 LDLIBS=-lm
 
-all : bin/cio_facts
+all : deps bin/cio_facts
 
 .PHONY: check
 check : all

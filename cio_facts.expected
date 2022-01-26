@@ -1,0 +1,23 @@
+src/cio_facts.c 6: CIOBase facts check started
+src/cio_facts.c 6: CIOBase facts check ended
+src/cio_facts.c 22: CIOArrayU8Fixed facts check started
+src/cio_facts.c 22: CIOArrayU8Fixed facts check ended
+src/cio_facts.c 39: CIOArrayU16Dynamic facts check started
+src/cio_facts.c 39: CIOArrayU16Dynamic facts check ended
+src/cio_facts.c 55: CIOUTF8In facts check started
+src/cio_facts.c 55: CIOUTF8In facts check ended
+src/cio_facts.c 89: CIOUTF8Out facts check started
+src/cio_facts.c 89: CIOUTF8Out facts check ended
+src/cio_facts.c 121: CIOFILEIn facts check started
+src/cio_facts.c 121: CIOFILEIn facts check ended
+src/cio_facts.c 136: CIOFILEOut facts check started
+src/cio_facts.c 136: CIOFILEOut facts check ended
+facts summary.
+facts check CIOBase [1;32mpassed[0m
+facts check CIOArrayU8Fixed [1;32mpassed[0m
+facts check CIOArrayU16Dynamic [1;32mpassed[0m
+facts check CIOUTF8In [1;32mpassed[0m
+facts check CIOUTF8Out [1;32mpassed[0m
+facts check CIOFILEIn [1;32mpassed[0m
+facts check CIOFILEOut [1;32mpassed[0m
+2327 (100.0%) truths and 0 (0.0%) fictions checked.

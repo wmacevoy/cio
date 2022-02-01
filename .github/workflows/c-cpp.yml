@@ -29,7 +29,7 @@ jobs:
         repository: wmacevoy/utf8
         path: utf8
 
-- name: make all
+    - name: make all
       run: make -C main all
 
     - name: make check

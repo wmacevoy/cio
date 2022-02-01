@@ -7,6 +7,7 @@ CFLAGS=$(CDBG) $(COPT) $(CSTD) $(CINC)
 
 LDLIBS=-lm
 
+.PHONY: all
 all : bin/cio_facts
 
 .PHONY: check
@@ -36,4 +37,3 @@ tmp/cio_facts.o : src/cio_facts.c include/cio.h ../utf8/include/utf8.h ../facts/
 bin/cio_facts : tmp/cio_facts.o tmp/utf8.o tmp/cio.o tmp/facts.o
 	mkdir -p bin
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-

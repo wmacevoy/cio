@@ -11,7 +11,11 @@ all : bin/cio_facts
 
 .PHONY: check
 check : all
-	bin/cio_facts | diff - cio_facts.expected
+	bin/cio_facts | diff - expected/cio_facts.out
+
+.PHONY: expected
+expected : all
+	bin/cio_facts >expected/cio_facts.out || true
 
 tmp/facts.o: ../facts/src/facts.c ../facts/include/facts.h
 	mkdir -p tmp

@@ -1,0 +1,36 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout main
+      uses: actions/checkout@v2
+      with:
+        path: main
+
+    - name: Checkout facts
+      uses: actions/checkout@v2
+      with:
+        repository: wmacevoy/facts
+        path: facts
+
+    - name: Checkout utf8
+      uses: actions/checkout@v2
+      with:
+        repository: wmacevoy/utf8
+        path: utf8
+
+- name: make all
+      run: make -C main all
+
+    - name: make check
+      run: make -C main check

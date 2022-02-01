@@ -28,3 +28,11 @@ bin/cio_facts : tmp/cio_facts.o tmp/utf8.o tmp/cio.o tmp/facts.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 all : bin/cio_facts
+
+
+check : all
+	bin/cio_facts | diff - expected/cio_facts.out
+
+expected : all
+	bin/cio_facts > expected/cio_facts.out
+

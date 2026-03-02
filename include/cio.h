@@ -87,15 +87,6 @@ extern "C" {
 		    int capacity,
 		    int maxCapacity);
 
-  /* 
-  void CIOArrayWideCharInit(CIOArray *me,
-		    wchar_t *data,
-		    int allocated,		       
-		    int size,
-		    int capacity,
-		    int maxCapacity);
-  */
-
   void CIOArrayConstInit(CIOArray *me,
 		    CIOArrayElementReadPtr elementRead,
 		    CIOArrayElementWritePtr elementWrite,		    
@@ -121,13 +112,6 @@ extern "C" {
 			    int allocated,		       
 			    int size);
 
-  /*
-  void CIOArrayConstWideCharInit(CIOArray *me,
-				 const wchar_t *data,
-				 int allocated,		       
-				 int size);
-  */
-
   struct CIOFILEStruct;
   typedef struct CIOFILEStruct CIOFILE;
   struct CIOFILEStruct {
@@ -135,6 +119,7 @@ extern "C" {
     CIOArray buffer;
     uint8_t buffer0[16];
     FILE *file;
+    int head;
     int eof;
     int close;
   };
@@ -148,8 +133,10 @@ extern "C" {
     CIO *u8;
     CIOArray buffer;
     uint32_t buffer0[16];
+    int head;
+    int close;
   };
-  void CIOUTF8Init(CIOUTF8 *me, CIO *u8);
+  void CIOUTF8Init(CIOUTF8 *me, CIO *u8, int close);
   
 
 #ifdef __cplusplus

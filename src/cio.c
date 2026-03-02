@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
@@ -6,12 +7,14 @@
 #include "cio.h"
 
 int CIORead(void *me) {
+  assert(me != NULL);
   int status = ((CIO*)me)->read((CIO*)me);
   if (status != -1) { ++(((CIO*)me)->reads); }
   return status;
 }
 
 int CIOWrite(void *me, int data) {
+  assert(me != NULL);
   int status = -1;
   if (data != -1) {
     status = ((CIO*)me)->write((CIO*)me,data);
@@ -23,16 +26,18 @@ int CIOWrite(void *me, int data) {
 }
 
 int CIOPeek(void *me, int offset) {
+  assert(me != NULL);
   return ((CIO*)me)->peek((CIO*)me,offset);
 }
 
 void CIOClose(void *me) {
+  assert(me != NULL);
   ((CIO*)me)->close((CIO*)me);
 }
 
-int CIOGetReads(void *me) { return ((CIO*)me)->reads; }
+int CIOGetReads(void *me) { assert(me != NULL); return ((CIO*)me)->reads; }
 
-int CIOGetWrites(void *me) { return ((CIO*)me)->writes; }  
+int CIOGetWrites(void *me) { assert(me != NULL); return ((CIO*)me)->writes; }  
 
 static int CIOBaseRead(CIO *me) { return -1; }
 static int CIOBaseWrite(CIO *me, int data) { return 0; }
@@ -40,6 +45,7 @@ static int CIOBasePeek(CIO *me, int offset) { return -1; }
 static void CIOBaseClose(CIO *me) {}
 
 void CIOInit(CIO *me) {
+  assert(me != NULL);
   me->read = &CIOBaseRead;
   me->write = &CIOBaseWrite;
   me->peek = &CIOBasePeek;
@@ -71,9 +77,9 @@ static int CIOArrayWrite(CIOArray *me, int value) {
   int position = me->position;
   if (position >= me->capacity) {
     if (position < me->maxCapacity) {
-      int newCapacity = 3*position/2;
+      int newCapacity = (position <= INT_MAX / 3) ? 3 * position / 2 : me->maxCapacity;
       if (newCapacity < 32) newCapacity = 32;
-      if (newCapacity > me->maxCapacity) newCapacity=me->maxCapacity;
+      if (newCapacity > me->maxCapacity) newCapacity = me->maxCapacity;
       void *newData = malloc(me->elementSize*newCapacity);
       if (newData != NULL) {
 	if (me->data != NULL) {
@@ -129,6 +135,7 @@ void CIOArrayInit(CIOArray *me,
 		  int size,
 		  int capacity,
 		  int maxCapacity) {
+  assert(me != NULL);
   CIOInit(&me->base);
   me->base.read=(CIOReadPtr)&CIOArrayRead;
   me->base.write=(CIOWritePtr)&CIOArrayWrite;
@@ -242,62 +249,32 @@ void CIOArrayConstU32Init(CIOArray *me,
 	       (uint32_t*)data,allocated,size,size,size);
 }
 
-/*
-int CIOArrayElementReadWideChar(void *location) {
-  return *(wchar_t*)location;
-}
-
-void CIOArrayElementWriteWideChar(void *location, int value) {
-  *(wchar_t*)location = value;
-}
-
-
-void CIOArrayWideCharInit(CIOArray *me,
-		     wchar_t *data,
-		     int allocated,
-		     int size,
-		     int capacity,
-		     int maxCapacity) {
-  CIOArrayInit(me,
-	       CIOArrayElementReadWideChar,CIOArrayElementWriteWideChar,sizeof(wchar_t),
-	       data,allocated,size,capacity,maxCapacity);
-}
-
-void CIOArrayConstWideCharInit(CIOArray *me,
-			       const wchar_t *data,
-			       int allocated,
-			       int size) {
-  CIOArrayInit(me,
-	       CIOArrayElementReadWideChar,NULL,sizeof(wchar_t),
-	       (wchar_t*)data,allocated,size,size,size);
-}
-
-*/
-
 
 static int CIOFILEPeek(CIOFILE *me, int offset) {
-  while (me->buffer.size <= offset && !me->eof) {
+  int idx = me->head + offset;
+  while (me->buffer.size <= idx && !me->eof) {
     int c = fgetc(me->file);
     if (c == -1) {
-      me->eof=1;
+      me->eof = 1;
       break;
     }
-    if (CIOWrite(&me->buffer,c)==-1) { me->eof=1; return -1; }
+    if (CIOWrite(&me->buffer, c) == -1) { me->eof = 1; return -1; }
   }
-  return (offset < me->buffer.size ? ((uint8_t*)me->buffer.data)[offset] : -1);
+  return (idx < me->buffer.size ? ((uint8_t*)me->buffer.data)[idx] : -1);
 }
 
 int CIOFILERead(CIOFILE *me) {
-  
-  int ans = CIOFILEPeek(me,0);
+  int ans = CIOFILEPeek(me, 0);
   if (ans != -1) {
-    uint8_t *data = (uint8_t*)me->buffer.data;
-    int size = me->buffer.size;
-    for (int i = 1; i<size; ++i) {
-      data[i-1]=data[i];
+    ++me->head;
+    if (me->head > 0 && me->head >= me->buffer.size / 2) {
+      int remaining = me->buffer.size - me->head;
+      uint8_t *data = (uint8_t*)me->buffer.data;
+      memmove(data, data + me->head, remaining);
+      me->buffer.size = remaining;
+      me->buffer.position = remaining;
+      me->head = 0;
     }
-    --me->buffer.size;
-    --me->buffer.position;
   }
   return ans;
 }
@@ -320,22 +297,25 @@ void CIOFILEClose(CIOFILE *me) {
 }
 
 void CIOFILEInit(CIOFILE *me,FILE *file,int close) {
+  assert(me != NULL);
   CIOInit(&me->base);
   me->base.read = (CIOReadPtr) &CIOFILERead;
-  me->base.peek = (CIOPeekPtr) &CIOFILEPeek;  
+  me->base.peek = (CIOPeekPtr) &CIOFILEPeek;
   me->base.write = (CIOWritePtr) &CIOFILEWrite;
   me->base.close = (CIOClosePtr) &CIOFILEClose;
-  
+
   CIOArrayU8Init(&me->buffer,me->buffer0,0,0,sizeof(me->buffer0)/sizeof(uint8_t),INT_MAX);
-  
+
   me->file=file;
+  me->head=0;
   me->eof=0;
   me->close=close;
 }
 
 static int CIOUTF8Peek(CIOUTF8 *me, int offset) {
   char buf[6];
-  while (me->buffer.size <= offset) {
+  int idx = me->head + offset;
+  while (me->buffer.size <= idx) {
     int decoded = 0;
     for (int len = 1; len<=4; ++len) {
       int c = CIOPeek(me->u8,len-1);
@@ -351,24 +331,26 @@ static int CIOUTF8Peek(CIOUTF8 *me, int offset) {
 	break;
       }
     }
-    *(uint32_t*)buf=0;    
+    *(uint32_t*)buf=0;
     if (!decoded) {
       return -1;
     }
   }
-  return ((uint32_t*)me->buffer.data)[offset];
+  return ((uint32_t*)me->buffer.data)[idx];
 }
 
 int CIOUTF8Read(CIOUTF8 *me) {
   int ans = CIOUTF8Peek(me,0);
   if (ans != -1) {
-    uint32_t *data = (uint32_t*)me->buffer.data;
-    int size = me->buffer.size;
-    for (int i = 1; i<size; ++i) {
-      data[i-1]=data[i];
+    ++me->head;
+    if (me->head > 0 && me->head >= me->buffer.size / 2) {
+      int remaining = me->buffer.size - me->head;
+      uint32_t *data = (uint32_t*)me->buffer.data;
+      memmove(data, data + me->head, remaining * sizeof(uint32_t));
+      me->buffer.size = remaining;
+      me->buffer.position = remaining;
+      me->head = 0;
     }
-    --me->buffer.size;
-    --me->buffer.position;
   }
   return ans;
 }
@@ -385,16 +367,22 @@ int CIOUTF8Write(CIOUTF8 *me, int wc) {
 
 void CIOUTF8Close(CIOUTF8 *me) {
   CIOClose(&me->buffer);
+  if (me->close) {
+    CIOClose(me->u8);
+  }
 }
 
-void CIOUTF8Init(CIOUTF8 *me, CIO *u8) {
+void CIOUTF8Init(CIOUTF8 *me, CIO *u8, int close) {
+  assert(me != NULL);
   CIOInit(&me->base);
   CIOArrayU32Init(&me->buffer,me->buffer0,0,0,sizeof(me->buffer0)/sizeof(uint32_t),INT_MAX);
   me->base.read = (CIOReadPtr)&CIOUTF8Read;
-  me->base.peek = (CIOPeekPtr)&CIOUTF8Peek;  
+  me->base.peek = (CIOPeekPtr)&CIOUTF8Peek;
   me->base.write = (CIOWritePtr)&CIOUTF8Write;
   me->base.close = (CIOClosePtr)&CIOUTF8Close;
   me->u8=u8;
+  me->head=0;
+  me->close=close;
 }
 
 

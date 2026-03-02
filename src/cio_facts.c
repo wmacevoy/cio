@@ -67,7 +67,7 @@ FACTS(CIOUTF8In) {
   CIOArray u8;
   CIOArrayConstU8Init(&u8,(uint8_t*)buf,0,p-buf);
   CIOUTF8 utf8;
-  CIOUTF8Init(&utf8,&u8.base);
+  CIOUTF8Init(&utf8,&u8.base,0);
   for (int k=0; k<10; ++k) {
     for (int len=1; len<=4; ++len) {
       int c = (1<<(5*len))|(k+1);
@@ -102,7 +102,7 @@ FACTS(CIOUTF8Out) {
   CIOArray u8;
   CIOArrayU8Init(&u8,NULL,0,0,0,INT_MAX);
   CIOUTF8 utf8;
-  CIOUTF8Init(&utf8,&u8.base);  
+  CIOUTF8Init(&utf8,&u8.base,0);
 
   for (int k=0; k<10; ++k) {
     for (int len=1; len<=4; ++len) {
@@ -116,6 +116,33 @@ FACTS(CIOUTF8Out) {
 
   CIOClose(&utf8);
   CIOClose(&u8);
+}
+
+FACTS(CIOUTF8Close) {
+  char buf[1024];
+  char *p=buf;
+  for (int k=0; k<10; ++k) {
+    for (int len=1; len<=4; ++len) {
+      int c = (1<<(5*len))|(k+1);
+      utf8encval(p,c,len);
+      p += len;
+    }
+  }
+  CIOArray u8;
+  CIOArrayConstU8Init(&u8,(uint8_t*)buf,0,p-buf);
+  CIOUTF8 utf8;
+  CIOUTF8Init(&utf8,&u8.base,1);
+  for (int k=0; k<10; ++k) {
+    for (int len=1; len<=4; ++len) {
+      int c = (1<<(5*len))|(k+1);
+      FACT(CIORead(&utf8),==,c);
+    }
+  }
+  FACT(CIORead(&utf8),==,-1);
+  CIOClose(&utf8);
+  // u8 was closed by utf8 since close=1; verify position was reset
+  FACT(u8.position,==,0);
+  FACT(u8.size,==,0);
 }
 
 FACTS(CIOFILEIn) {
@@ -154,6 +181,7 @@ FACTS_REGISTER_ALL() {
     FACTS_REGISTER(CIOArrayU16Dynamic);
     FACTS_REGISTER(CIOUTF8In);
     FACTS_REGISTER(CIOUTF8Out);
+    FACTS_REGISTER(CIOUTF8Close);
     FACTS_REGISTER(CIOFILEIn);
     FACTS_REGISTER(CIOFILEOut);
 }

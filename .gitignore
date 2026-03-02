@@ -36,6 +36,10 @@
 *.x86_64
 *.hex
 
+# Build output
+bin/
+tmp/
+
 # Debug files
 *.dSYM/
 *.su

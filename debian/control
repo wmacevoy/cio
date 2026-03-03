@@ -1,0 +1,26 @@
+Source: libcio
+Section: libs
+Priority: optional
+Maintainer: Warren MacEvoy <wmacevoy@gmail.com>
+Build-Depends: debhelper-compat (= 13), libutf8-dev
+Standards-Version: 4.6.0
+Homepage: https://github.com/wmacevoy/cio
+
+Package: libcio-1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Lightweight abstract character I/O library for C
+ Provides a polymorphic I/O interface with pluggable backends
+ including arrays, FILE streams, and UTF-8 codec layers.
+ Uses function-pointer dispatch for read/write/peek/close operations.
+
+Package: libcio-dev
+Section: libdevel
+Architecture: any
+Depends: libcio-1 (= ${binary:Version}), ${misc:Depends}
+Description: Lightweight abstract character I/O library for C (development files)
+ Provides a polymorphic I/O interface with pluggable backends
+ including arrays, FILE streams, and UTF-8 codec layers.
+ Uses function-pointer dispatch for read/write/peek/close operations.
+ .
+ This package contains the header files and static library for development.

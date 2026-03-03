@@ -39,11 +39,60 @@ CIOWrite(&out, 'i');
 CIOClose(&out);
 ```
 
-## Build
+## Dependencies
 
-Requires sibling checkouts of [facts](https://github.com/wmacevoy/facts) and [utf8](https://github.com/wmacevoy/utf8).
+- [libutf8](https://github.com/wmacevoy/utf8) — installed system-wide
+- [facts](https://github.com/wmacevoy/facts) — vendored as git submodule (tests only)
+
+## Build (Make)
+
+Requires libutf8 installed (`make -C ../utf8 all && sudo make -C ../utf8 install`).
 
 ```sh
-make all    # build
-make check  # run tests
+git submodule update --init   # fetch test framework
+make all                      # build libcio.a + libcio.dylib/so
+make check                    # run tests
+sudo make install             # install to /usr/local
+make clean                    # remove build artifacts
+```
+
+## Build (CMake)
+
+```sh
+cmake -B build
+cmake --build build
+sudo cmake --install build
+```
+
+To build tests with CMake:
+```sh
+cmake -B build -DCIO_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build
+```
+
+## Install
+
+### From source
+```sh
+make && sudo make install
+# or
+cmake -B build && cmake --build build && sudo cmake --install build
+```
+
+### Debian / Ubuntu
+```sh
+sudo dpkg -i libcio-1_*.deb libcio-dev_*.deb
+```
+
+### Homebrew
+```sh
+brew tap wmacevoy/cio
+brew install cio
+```
+
+### pkg-config
+After installation, use in your build:
+```sh
+cc $(pkg-config --cflags --libs cio) -o myapp myapp.c
 ```

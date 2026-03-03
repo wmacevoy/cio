@@ -1,0 +1,253 @@
+name: Release
+
+# Trigger on version tags
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  # ── Build and test ──────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install libutf8
+        run: |
+          git clone https://github.com/wmacevoy/utf8.git /tmp/utf8
+          cd /tmp/utf8 && git submodule update --init
+          make -C /tmp/utf8 all
+          sudo make -C /tmp/utf8 install
+          sudo ldconfig
+
+      - name: Build and test
+        run: make check
+
+  # ── Debian .deb packages ────────────────────────────────────────
+  deb:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y debhelper dpkg-dev
+          git clone https://github.com/wmacevoy/utf8.git /tmp/utf8
+          cd /tmp/utf8 && git submodule update --init
+          make -C /tmp/utf8 all
+          sudo make -C /tmp/utf8 install
+          sudo ldconfig
+
+      - name: Build .deb packages
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Upload .deb artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-packages
+          path: |
+            ../*.deb
+            ../*.changes
+
+  # ── Alpine .apk packages ───────────────────────────────────────
+  apk:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build .apk in Alpine container
+        run: |
+          docker run --rm \
+            -v "$PWD":/src \
+            -w /src \
+            alpine:latest sh -c '
+              set -e
+              apk add --no-cache build-base cmake abuild git
+
+              # Install libutf8
+              git clone https://github.com/wmacevoy/utf8.git /tmp/utf8
+              cd /tmp/utf8
+              cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib
+              cmake --build build
+              cmake --install build
+              cd /src
+
+              # Set up abuild signing key (ephemeral, CI-only)
+              mkdir -p /root/.abuild
+              abuild-keygen -a -i -n
+
+              # Copy APKBUILD to a workspace
+              mkdir -p /tmp/build
+              cp packaging/alpine/APKBUILD /tmp/build/
+
+              # Create source tarball from current checkout
+              VERSION=$(grep "^pkgver=" packaging/alpine/APKBUILD | cut -d= -f2)
+              TARBALL="libcio-${VERSION}.tar.gz"
+              tar czf "/tmp/build/${TARBALL}" \
+                --transform "s,^,cio-${VERSION}/," \
+                --exclude=.git --exclude=build --exclude=bin \
+                .
+
+              # Update APKBUILD checksums and build
+              cd /tmp/build
+              sed -i "s|https://github.com/.*|/tmp/build/${TARBALL}\"|" APKBUILD
+              abuild checksum
+              abuild -F -r
+
+              # Copy packages out
+              cp /root/packages/tmp/build/$(uname -m)/*.apk /src/
+            '
+
+      - name: Upload .apk artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-packages
+          path: '*.apk'
+
+  # ── Windows build (CMake) ───────────────────────────────────────
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libutf8
+        run: |
+          git clone https://github.com/wmacevoy/utf8.git $env:RUNNER_TEMP\utf8
+          cmake -B $env:RUNNER_TEMP\utf8\build -S $env:RUNNER_TEMP\utf8 -DCMAKE_BUILD_TYPE=Release
+          cmake --build $env:RUNNER_TEMP\utf8\build --config Release
+          cmake --install $env:RUNNER_TEMP\utf8\build --config Release --prefix $env:RUNNER_TEMP\deps
+
+      - name: Configure and build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$env:RUNNER_TEMP\deps
+          cmake --build build --config Release
+
+      - name: Package
+        run: cmake --install build --config Release --prefix install
+
+      - name: Create zip
+        run: Compress-Archive -Path install\* -DestinationPath libcio-windows-x64.zip
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: libcio-windows-x64.zip
+
+  # ── GitHub Release ──────────────────────────────────────────────
+  release:
+    needs: [deb, apk, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Compute source tarball sha256
+        id: sha
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          URL="https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz"
+          SHA=$(curl -sL "$URL" | sha256sum | cut -d' ' -f1)
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Source tarball sha256:** `${{ steps.sha.outputs.sha256 }}`
+
+            ### Debian / Ubuntu
+            ```sh
+            sudo dpkg -i libcio-1_*.deb libcio-dev_*.deb
+            ```
+
+            ### Homebrew
+            ```sh
+            brew tap wmacevoy/cio
+            brew install cio
+            ```
+
+            ### Alpine
+            ```sh
+            apk add --allow-untrusted libcio-*.apk
+            ```
+
+            ### From source
+            ```sh
+            make && sudo make install
+            # or
+            cmake -B build && cmake --build build && sudo cmake --install build
+            ```
+          files: |
+            artifacts/deb-packages/*.deb
+            artifacts/apk-packages/*.apk
+            artifacts/windows-package/*.zip
+
+  # ── Publish apt repo to GitHub Pages ────────────────────────────
+  apt-repo:
+    needs: release
+    runs-on: ubuntu-latest
+    if: ${{ vars.ENABLE_APT_REPO == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download .deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-packages
+          path: debs
+
+      - name: Install reprepro
+        run: sudo apt-get update && sudo apt-get install -y reprepro
+
+      - name: Import GPG key
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+      - name: Get GPG key ID
+        id: gpg
+        run: echo "keyid=$(gpg --list-secret-keys --keyid-format long | grep sec | awk '{print $2}' | cut -d/ -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Build apt repository
+        run: |
+          mkdir -p apt/conf
+          cat > apt/conf/distributions <<CONF
+          Origin: wmacevoy
+          Label: libcio
+          Codename: stable
+          Architectures: amd64 arm64 i386
+          Components: main
+          SignWith: ${{ steps.gpg.outputs.keyid }}
+          CONF
+
+          for deb in debs/*.deb; do
+            reprepro -b apt includedeb stable "$deb"
+          done
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apt
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

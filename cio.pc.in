@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+libdir=@LIBDIR@
+includedir=@INCLUDEDIR@
+
+Name: cio
+Description: Lightweight abstract character I/O library for C
+Version: @PROJECT_VERSION@
+Requires: utf8
+Cflags: -I${includedir}
+Libs: -L${libdir} -lcio

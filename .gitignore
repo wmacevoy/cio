@@ -39,6 +39,8 @@
 # Build output
 bin/
 tmp/
+build/
+*.pc
 
 # Debug files
 *.dSYM/

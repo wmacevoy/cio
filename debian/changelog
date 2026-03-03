@@ -1,0 +1,8 @@
+libcio (1.0.0-1) unstable; urgency=low
+
+  * Initial release.
+  * Polymorphic character I/O with CIOArray, CIOFILE, and CIOUTF8 backends.
+  * Circular buffer for efficient buffered reads.
+  * UTF-8 codec layer over byte streams.
+
+ -- Warren MacEvoy <wmacevoy@gmail.com>  Mon, 02 Mar 2026 00:00:00 +0000

@@ -1,39 +1,111 @@
-CSTD?=-std=c11
-CDBG?=-g
-COPT?=
-CINC?=-Iinclude -I../facts/include -I../utf8/include
+VERSION_MAJOR = 1
+VERSION_MINOR = 0
+VERSION_PATCH = 0
+VERSION = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
 
-CFLAGS=$(CDBG) $(COPT) $(CSTD) $(CINC)
+PREFIX    ?= /usr/local
+LIBDIR    ?= $(PREFIX)/lib
+INCLUDEDIR?= $(PREFIX)/include
+PKGCONFIGDIR ?= $(LIBDIR)/pkgconfig
 
-LDLIBS=-lm
+CC       ?= cc
+CFLAGS   ?= -g
+CFLAGS   += -std=c11 -Iinclude
+LDLIBS   = -lm -lutf8
 
-.PHONY: all
-all : bin/cio_facts
+UNAME_S := $(shell uname -s)
+
+# Library targets
+STATIC_LIB = libcio.a
+ifeq ($(UNAME_S),Darwin)
+  SHARED_LIB = libcio.$(VERSION_MAJOR).dylib
+  SONAME_FLAG = -install_name,$(LIBDIR)/$(SHARED_LIB)
+  SOLINK     = libcio.dylib
+else
+  SHARED_LIB = libcio.so.$(VERSION)
+  SONAME     = libcio.so.$(VERSION_MAJOR)
+  SONAME_FLAG = -soname,$(SONAME)
+  SOLINK     = libcio.so
+endif
+
+LIB_SRC = src/cio.c
+LIB_OBJ = src/cio.o
+LIB_PIC = src/cio.pic.o
+
+# Test target
+TEST_BIN = bin/cio_facts
+TEST_SRC = src/cio_facts.c
+FACTS_SRC = vendor/facts/src/facts.c
+TEST_CFLAGS = $(CFLAGS) -Ivendor/facts/include
+
+all: $(STATIC_LIB) $(SHARED_LIB)
+
+$(LIB_OBJ): $(LIB_SRC) include/cio.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(LIB_PIC): $(LIB_SRC) include/cio.h
+	$(CC) $(CFLAGS) -fPIC -c -o $@ $<
+
+$(STATIC_LIB): $(LIB_OBJ)
+	$(AR) rcs $@ $<
+
+$(SHARED_LIB): $(LIB_PIC)
+	$(CC) -shared -Wl,$(SONAME_FLAG) $(LDFLAGS) -o $@ $< $(LDLIBS)
+
+$(TEST_BIN): $(TEST_SRC) $(STATIC_LIB) include/cio.h
+	mkdir -p bin
+	$(CC) $(TEST_CFLAGS) $(LDFLAGS) -o $@ $(TEST_SRC) $(FACTS_SRC) $(STATIC_LIB) $(LDLIBS)
 
 .PHONY: check
-check : all
-	bin/cio_facts | diff - expected/cio_facts.out
+check: $(TEST_BIN)
+	$(TEST_BIN) | diff - expected/cio_facts.out
 
 .PHONY: expected
-expected : all
-	bin/cio_facts >expected/cio_facts.out || true
+expected: $(TEST_BIN)
+	$(TEST_BIN) >expected/cio_facts.out || true
 
-tmp/facts.o: ../facts/src/facts.c ../facts/include/facts.h
-	mkdir -p tmp
-	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
+cio.pc: cio.pc.in
+	sed -e 's|@PREFIX@|$(PREFIX)|g' \
+	    -e 's|@LIBDIR@|$(LIBDIR)|g' \
+	    -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|g' \
+	    -e 's|@PROJECT_VERSION@|$(VERSION)|g' \
+	    $< >$@
 
-tmp/utf8.o: ../utf8/src/utf8.c ../utf8/include/utf8.h
-	mkdir -p tmp
-	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
+.PHONY: install
+install: $(STATIC_LIB) $(SHARED_LIB) cio.pc
+	install -d $(DESTDIR)$(INCLUDEDIR)
+	install -d $(DESTDIR)$(LIBDIR)
+	install -d $(DESTDIR)$(PKGCONFIGDIR)
+	install -m 644 include/cio.h $(DESTDIR)$(INCLUDEDIR)/cio.h
+	install -m 644 $(STATIC_LIB) $(DESTDIR)$(LIBDIR)/$(STATIC_LIB)
+	install -m 755 $(SHARED_LIB) $(DESTDIR)$(LIBDIR)/$(SHARED_LIB)
+ifneq ($(UNAME_S),Darwin)
+	ln -sf $(SHARED_LIB) $(DESTDIR)$(LIBDIR)/$(SONAME)
+endif
+	ln -sf $(SHARED_LIB) $(DESTDIR)$(LIBDIR)/$(SOLINK)
+	install -m 644 cio.pc $(DESTDIR)$(PKGCONFIGDIR)/cio.pc
 
-tmp/cio.o: src/cio.c include/cio.h ../utf8/include/utf8.h
-	mkdir -p tmp
-	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(INCLUDEDIR)/cio.h
+	rm -f $(DESTDIR)$(LIBDIR)/$(STATIC_LIB)
+	rm -f $(DESTDIR)$(LIBDIR)/$(SHARED_LIB)
+ifneq ($(UNAME_S),Darwin)
+	rm -f $(DESTDIR)$(LIBDIR)/$(SONAME)
+endif
+	rm -f $(DESTDIR)$(LIBDIR)/$(SOLINK)
+	rm -f $(DESTDIR)$(PKGCONFIGDIR)/cio.pc
 
-tmp/cio_facts.o : src/cio_facts.c include/cio.h ../utf8/include/utf8.h ../facts/include/facts.h
-	mkdir -p tmp
-	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
+# Cosmopolitan Libc (Actually Portable Executable) — static only
+.PHONY: cosmo
+cosmo:
+	$(MAKE) CC=cosmocc AR=cosmoar $(STATIC_LIB)
 
-bin/cio_facts : tmp/cio_facts.o tmp/utf8.o tmp/cio.o tmp/facts.o
-	mkdir -p bin
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+.PHONY: cosmo-check
+cosmo-check:
+	$(MAKE) CC=cosmocc AR=cosmoar check
+
+.PHONY: clean
+clean:
+	rm -f src/*.o $(STATIC_LIB) $(SHARED_LIB) libcio.so* libcio*.dylib cio.pc
+	rm -rf bin

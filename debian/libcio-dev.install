@@ -1,0 +1,4 @@
+usr/include/cio.h
+usr/lib/*/libcio.a
+usr/lib/*/libcio.so
+usr/lib/*/pkgconfig/cio.pc

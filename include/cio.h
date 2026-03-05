@@ -87,30 +87,8 @@ extern "C" {
 		    int capacity,
 		    int maxCapacity);
 
-  void CIOArrayConstInit(CIOArray *me,
-		    CIOArrayElementReadPtr elementRead,
-		    CIOArrayElementWritePtr elementWrite,		    
-		    int elementSize,
-		    void *data,
-		    int allocated,
-		    int size,
-		    int capacity,
-		    int maxCapacity);
-
-  void CIOArrayConstU8Init(CIOArray *me,
-			   const uint8_t *data,
-			   int allocated,	      
-			   int size);
-  
-  void CIOArrayConstU16Init(CIOArray *me,
-			    const uint16_t *data,
-			    int allocated,		       
-			    int size);
-  
-  void CIOArrayConstU32Init(CIOArray *me,
-			    const uint32_t *data,
-			    int allocated,		       
-			    int size);
+  void *CIOArrayGetData(void *me);
+  int CIOArrayGetSize(void *me);
 
   struct CIOFILEStruct;
   typedef struct CIOFILEStruct CIOFILE;

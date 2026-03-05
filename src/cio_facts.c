@@ -65,7 +65,7 @@ FACTS(CIOUTF8In) {
   }
   *p = 0;
   CIOArray u8;
-  CIOArrayConstU8Init(&u8,(uint8_t*)buf,0,p-buf);
+  CIOArrayU8Init(&u8,(uint8_t*)buf,0,p-buf,p-buf,p-buf);
   CIOUTF8 utf8;
   CIOUTF8Init(&utf8,&u8.base,0);
   for (int k=0; k<10; ++k) {
@@ -129,7 +129,7 @@ FACTS(CIOUTF8Close) {
     }
   }
   CIOArray u8;
-  CIOArrayConstU8Init(&u8,(uint8_t*)buf,0,p-buf);
+  CIOArrayU8Init(&u8,(uint8_t*)buf,0,p-buf,p-buf,p-buf);
   CIOUTF8 utf8;
   CIOUTF8Init(&utf8,&u8.base,1);
   for (int k=0; k<10; ++k) {
@@ -175,6 +175,78 @@ FACTS(CIOFILEOut) {
   CIOClose(&co);
 }
 
+FACTS(CIOArrayU8Read) {
+  uint8_t data[] = {10, 20, 30, 40, 50};
+  CIOArray io;
+  CIOArrayU8Init(&io, data, 0, 5, 5, 5);
+  // Peek without consuming
+  for (int i = 0; i < 5; ++i) {
+    FACT(CIOPeek(&io, i), ==, (i+1)*10);
+  }
+  FACT(CIOPeek(&io, 5), ==, -1);
+  // Read consumes
+  for (int i = 0; i < 5; ++i) {
+    FACT(CIORead(&io), ==, (i+1)*10);
+  }
+  FACT(CIORead(&io), ==, -1);
+  FACT(CIOGetReads(&io), ==, 5);
+  CIOClose(&io);
+}
+
+FACTS(CIOArrayU32RoundTrip) {
+  CIOArray io;
+  CIOArrayU32Init(&io, NULL, 0, 0, 0, 100);
+  for (int i = 0; i < 50; ++i) {
+    FACT(CIOWrite(&io, 1000 + i), ==, 0);
+  }
+  FACT(CIOGetWrites(&io), ==, 50);
+  FACT(CIOArrayGetSize(&io), ==, 50);
+  // Reset position for reading
+  io.position = 0;
+  for (int i = 0; i < 50; ++i) {
+    FACT(CIORead(&io), ==, 1000 + i);
+  }
+  FACT(CIORead(&io), ==, -1);
+  CIOClose(&io);
+}
+
+FACTS(CIOErrorPaths) {
+  // Writing to a full fixed array
+  uint8_t a[2] = {0, 0};
+  CIOArray fixed;
+  CIOArrayU8Init(&fixed, a, 0, 0, 2, 2);
+  FACT(CIOWrite(&fixed, 1), ==, 0);
+  FACT(CIOWrite(&fixed, 2), ==, 0);
+  FACT(CIOWrite(&fixed, 3), ==, -1);  // position 2 >= capacity 2, can't grow
+  CIOClose(&fixed);
+
+  // Reading past EOF on CIOFILE
+  FILE *tmp = tmpfile();
+  fprintf(tmp, "AB");
+  fseek(tmp, 0, SEEK_SET);
+  CIOFILE ci;
+  CIOFILEInit(&ci, tmp, 0);
+  FACT(CIORead(&ci), ==, 'A');
+  FACT(CIORead(&ci), ==, 'B');
+  FACT(CIORead(&ci), ==, -1);
+  FACT(CIOPeek(&ci, 0), ==, -1);
+  CIOClose(&ci);
+  fclose(tmp);
+
+  // Double close safety
+  CIOArray dc;
+  CIOArrayU8Init(&dc, NULL, 0, 0, 0, 10);
+  CIOWrite(&dc, 42);
+  CIOClose(&dc);
+  CIOClose(&dc);  // should not crash
+
+  // CIOWrite with -1 returns error, does not close
+  CIO io;
+  CIOInit(&io);
+  FACT(CIOWrite(&io, -1), ==, -1);
+  FACT(CIOGetWrites(&io), ==, 0);
+}
+
 FACTS_REGISTER_ALL() {
     FACTS_REGISTER(CIOBase);
     FACTS_REGISTER(CIOArrayU8Fixed);
@@ -184,6 +256,9 @@ FACTS_REGISTER_ALL() {
     FACTS_REGISTER(CIOUTF8Close);
     FACTS_REGISTER(CIOFILEIn);
     FACTS_REGISTER(CIOFILEOut);
+    FACTS_REGISTER(CIOArrayU8Read);
+    FACTS_REGISTER(CIOArrayU32RoundTrip);
+    FACTS_REGISTER(CIOErrorPaths);
 }
 
 FACTS_MAIN

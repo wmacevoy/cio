@@ -15,13 +15,9 @@ int CIORead(void *me) {
 
 int CIOWrite(void *me, int data) {
   assert(me != NULL);
-  int status = -1;
-  if (data != -1) {
-    status = ((CIO*)me)->write((CIO*)me,data);
-    if (status != -1) { ++(((CIO*)me)->writes); }
-  } else {
-    ((CIO*)me)->close((CIO*)me);
-  }
+  if (data == -1) { return -1; }
+  int status = ((CIO*)me)->write((CIO*)me,data);
+  if (status != -1) { ++(((CIO*)me)->writes); }
   return status;
 }
 
@@ -89,9 +85,9 @@ static int CIOArrayWrite(CIOArray *me, int value) {
 	    free(me->data);
 	  }
 	}
-	memset(((unsigned char*)newData)+me->elementSize*me->capacity,
+	memset(((unsigned char*)newData)+me->elementSize*me->size,
 	       0,
-	       me->elementSize*(newCapacity-me->capacity));
+	       me->elementSize*(newCapacity-me->size));
 	me->data = newData;
 	me->capacity = newCapacity;
 	me->allocated = 1;
@@ -124,6 +120,7 @@ static void CIOArrayClose(CIOArray *me) {
   }
   me->position = 0;
   me->size = 0;
+  me->base.close = &CIOBaseClose;
 }
 
 void CIOArrayInit(CIOArray *me,
@@ -196,16 +193,16 @@ void CIOArrayU8Init(CIOArray *me,
 	       data,allocated,size,capacity,maxCapacity);
 }
 
-void CIOArrayConstU8Init(CIOArray *me,
-			 const uint8_t *data,
-			 int allocated,
-			 int size) {
-  CIOArrayInit(me,
-	       CIOArrayElementReadU8,NULL,sizeof(uint8_t),
-	       (uint8_t*)data,allocated,size,size,size);
+void *CIOArrayGetData(void *me) {
+  assert(me != NULL);
+  return ((CIOArray*)me)->data;
 }
 
-  
+int CIOArrayGetSize(void *me) {
+  assert(me != NULL);
+  return ((CIOArray*)me)->size;
+}
+
 void CIOArrayU16Init(CIOArray *me,
 		     uint16_t *data,
 		     int allocated,
@@ -218,17 +215,6 @@ void CIOArrayU16Init(CIOArray *me,
   
 }
 
-void CIOArrayConstU16Init(CIOArray *me,
-			  const uint16_t *data,
-			  int allocated,
-			  int size) {
-  CIOArrayInit(me,
-	       CIOArrayElementReadU16,NULL,sizeof(uint16_t),
-	       (uint16_t*)data,allocated,size,size,size);
-  
-}
-
-
 void CIOArrayU32Init(CIOArray *me,
 		     uint32_t *data,
 		     int allocated,
@@ -240,21 +226,11 @@ void CIOArrayU32Init(CIOArray *me,
 	       data,allocated,size,capacity,maxCapacity);
 }
 
-void CIOArrayConstU32Init(CIOArray *me,
-			  const uint32_t *data,
-			  int allocated,
-			  int size) {
-  CIOArrayInit(me,
-	       CIOArrayElementReadU32,NULL,sizeof(uint32_t),
-	       (uint32_t*)data,allocated,size,size,size);
-}
-
-
 static int CIOFILEPeek(CIOFILE *me, int offset) {
   int idx = me->head + offset;
   while (me->buffer.size <= idx && !me->eof) {
     int c = fgetc(me->file);
-    if (c == -1) {
+    if (c == EOF || ferror(me->file)) {
       me->eof = 1;
       break;
     }
@@ -263,7 +239,7 @@ static int CIOFILEPeek(CIOFILE *me, int offset) {
   return (idx < me->buffer.size ? ((uint8_t*)me->buffer.data)[idx] : -1);
 }
 
-int CIOFILERead(CIOFILE *me) {
+static int CIOFILERead(CIOFILE *me) {
   int ans = CIOFILEPeek(me, 0);
   if (ans != -1) {
     ++me->head;
@@ -279,21 +255,19 @@ int CIOFILERead(CIOFILE *me) {
   return ans;
 }
 
-int CIOFILEWrite(CIOFILE *me,int value) {
-  if (value != -1) {
-    char c=value;
-    if (fwrite(&c,1,1,me->file) != 1) { return -1; }
-    return 0;
-  }
-  return -1;
+static int CIOFILEWrite(CIOFILE *me,int value) {
+  char c=value;
+  if (fwrite(&c,1,1,me->file) != 1) { return -1; }
+  return 0;
 }
 
-void CIOFILEClose(CIOFILE *me) {
+static void CIOFILEClose(CIOFILE *me) {
   CIOClose(&me->buffer);
   if (me->close) {
     fclose(me->file);
     me->file = NULL;
   }
+  me->base.close = &CIOBaseClose;
 }
 
 void CIOFILEInit(CIOFILE *me,FILE *file,int close) {
@@ -339,7 +313,7 @@ static int CIOUTF8Peek(CIOUTF8 *me, int offset) {
   return ((uint32_t*)me->buffer.data)[idx];
 }
 
-int CIOUTF8Read(CIOUTF8 *me) {
+static int CIOUTF8Read(CIOUTF8 *me) {
   int ans = CIOUTF8Peek(me,0);
   if (ans != -1) {
     ++me->head;
@@ -355,9 +329,10 @@ int CIOUTF8Read(CIOUTF8 *me) {
   return ans;
 }
 
-int CIOUTF8Write(CIOUTF8 *me, int wc) {
+static int CIOUTF8Write(CIOUTF8 *me, int wc) {
   char buf[4];
   int enclen=utf8enclen(wc);
+  if (enclen == 0) { return -1; }
   utf8encval(buf,wc,enclen);
   for (int i=0; i<enclen; ++i) {
     if (CIOWrite(me->u8,buf[i]) == -1) { return -1; }
@@ -365,11 +340,12 @@ int CIOUTF8Write(CIOUTF8 *me, int wc) {
   return 0;
 }
 
-void CIOUTF8Close(CIOUTF8 *me) {
+static void CIOUTF8Close(CIOUTF8 *me) {
   CIOClose(&me->buffer);
   if (me->close) {
     CIOClose(me->u8);
   }
+  me->base.close = &CIOBaseClose;
 }
 
 void CIOUTF8Init(CIOUTF8 *me, CIO *u8, int close) {
